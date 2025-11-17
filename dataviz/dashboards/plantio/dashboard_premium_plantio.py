@@ -650,8 +650,7 @@ def update_premium_dashboard(n_clicks, variedade_filter, ciclo_filter, compariso
     ))
 
     fig_gauge.update_layout(
-        **get_default_layout(height=350),
-        font={'family': "Segoe UI"}
+        **get_default_layout(height=350)
     )
 
     # ========================================================================

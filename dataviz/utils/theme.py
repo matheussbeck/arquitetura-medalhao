@@ -50,6 +50,17 @@ SEQUENTIAL_COLORS = px.colors.sequential.Greens
 # Paleta Divergente (para comparações)
 DIVERGENT_COLORS = px.colors.diverging.RdYlGn
 
+# Dicionário de cores (para compatibilidade com dashboards premium)
+COLORS = {
+    'primary': PRIMARY_COLOR,
+    'secondary': SECONDARY_COLOR,
+    'accent': ACCENT_COLOR,
+    'success': SUCCESS_COLOR,
+    'warning': WARNING_COLOR,
+    'danger': DANGER_COLOR,
+    'info': INFO_COLOR
+}
+
 # ============================================================================
 # LAYOUT PADRÃO PLOTLY
 # ============================================================================
@@ -86,6 +97,24 @@ def get_default_layout(**kwargs):
         dict: Layout configurado
     """
     layout = PLOTLY_LAYOUT.copy()
+    layout.update(kwargs)
+    return layout
+
+
+def get_standard_layout(title="", **kwargs):
+    """
+    Retorna layout padrão estendido para gráficos Plotly (compatibilidade premium).
+
+    Args:
+        title: Título do gráfico
+        **kwargs: Sobrescreve valores padrão
+
+    Returns:
+        dict: Layout configurado
+    """
+    layout = PLOTLY_LAYOUT.copy()
+    if title:
+        layout['title'] = {'text': title, 'font': {'size': 16, 'color': TEXT_PRIMARY}}
     layout.update(kwargs)
     return layout
 

@@ -430,4 +430,4 @@ if __name__ == '__main__':
     print("📊 Acesse: http://localhost:8050")
     print("\n💡 Pressione CTRL+C para parar o servidor\n")
 
-    app.run_server(debug=True, host='0.0.0.0', port=8050)
+    app.run(debug=True, host='0.0.0.0', port=8050)

@@ -15,6 +15,8 @@ import dash
 from dash import dcc, html, Input, Output
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
+import plotly.express as px
+import pandas as pd
 from datetime import datetime, timedelta
 
 from theme import *
@@ -148,4 +150,4 @@ app.layout.children.insert(0, dcc.Location(id='url', refresh=False))
 
 if __name__ == '__main__':
     print("\n🚀 Dashboard Agronômico - http://localhost:8052\n")
-    app.run_server(debug=True, host='0.0.0.0', port=8052)
+    app.run(debug=True, host='0.0.0.0', port=8052)

@@ -150,4 +150,4 @@ def update_dashboard(n_clicks):
 
 if __name__ == '__main__':
     print("\n🚀 Dashboard Vinhaça - http://localhost:8051\n")
-    app.run_server(debug=True, host='0.0.0.0', port=8051)
+    app.run(debug=True, host='0.0.0.0', port=8051)

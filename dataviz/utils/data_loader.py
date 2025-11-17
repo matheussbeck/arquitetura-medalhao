@@ -7,7 +7,6 @@ Carrega dados das camadas Gold do Data Lake para os dashboards.
 import pandas as pd
 from typing import Optional, List
 from datetime import datetime, timedelta
-from functools import lru_cache
 
 
 class DataLoader:
@@ -34,7 +33,6 @@ class DataLoader:
         elapsed = (datetime.now() - self._cache_time[key]).total_seconds()
         return elapsed < self.cache_timeout
 
-    @lru_cache(maxsize=128)
     def load_from_gold(
         self,
         table_path: str,

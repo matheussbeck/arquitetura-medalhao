@@ -1,6 +1,6 @@
-# 🏅 Arquitetura Medalhão - Data Lakehouse
+# 🏅 Arquitetura Medalhão - Data Lakehouse Agronegócio
 
-Projeto de migração de ETL do Power BI para arquitetura medalhão usando PySpark, com foco em **Data Lakehouse** e integração com Azure.
+Projeto completo de migração de ETL do Power BI para arquitetura medalhão usando PySpark, com **Dashboards Profissionais** em Dash Plotly, focado em **Agronegócio** e integração com Azure.
 
 ---
 
@@ -19,16 +19,18 @@ Este projeto implementa uma **Arquitetura Medalhão** (Medallion Architecture) p
 - **Silver**: Dados limpos, validados e padronizados
 - **Gold**: Agregações, métricas e modelos prontos para análise
 
-### Áreas de Negócio Suportadas
+### Áreas de Negócio Agronegócio
 
+- 🌱 **PLANTIO** - Dados de plantio, talhões, variedades, cronograma
+- 💧 **VINHAÇA** - Aplicação de vinhaça, análises químicas, fertirrigação
+- 🚜 **PREPARO DE SOLO** - Operações de preparo (aração, gradagem, subsolagem)
+- 🌾 **AGRONÔMICO** - Produtividade, TCH, ATR, análises de solo, clima
 - 🏭 **CCT** - Centro de Controle de Tráfego
-- 📦 **PRODUÇÃO** - Dados de produção e vendas
-- 🔧 **MANUTENÇÃO** - Ordens de manutenção e equipamentos
+- 🔧 **MANUTENÇÃO** - Equipamentos agrícolas e manutenção
 - 🤝 **APOIO** - Áreas de apoio operacional
 - 💼 **SSMA** - Sistema de Gestão
-- 🌾 **AGRONÔMICO** - Dados agronômicos e safras
-- 📊 **PLANEJAMENTO** - Planejamento e forecasting
-- 👔 **DIRETORIA** - Indicadores executivos
+- 📊 **PLANEJAMENTO** - Planejamento de safras
+- 👔 **DIRETORIA** - Indicadores executivos agrícolas
 - ⚖️ **GOVERNANÇA OPERACIONAL** - Compliance e governança
 - 📂 **OUTROS** - Outras áreas
 

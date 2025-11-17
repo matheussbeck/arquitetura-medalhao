@@ -1,0 +1,45 @@
+# ============================================================================
+# DEPENDÊNCIAS DATAVIZ - Dashboards Profissionais com Dash Plotly
+# ============================================================================
+# Instale com: pip install -r dataviz/requirements_dataviz.txt
+# ============================================================================
+
+# Dash Framework (Core)
+dash>=2.14.0
+dash-bootstrap-components>=1.5.0
+dash-ag-grid>=2.4.0  # Tabelas profissionais (similar Power BI)
+dash-mantine-components>=0.12.0  # Componentes modernos
+
+# Plotly (Gráficos)
+plotly>=5.18.0
+kaleido>=0.2.1  # Export de imagens
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Conexão com Dados
+pyspark>=3.4.0  # Ler de Gold layer
+pyodbc>=5.0.0  # SQL Server/Synapse
+sqlalchemy>=2.0.0
+
+# Mapas e Geoespacial
+folium>=0.15.0  # Mapas interativos
+geopandas>=0.14.0  # Dados geoespaciais
+shapely>=2.0.0  # Geometrias
+
+# Estatísticas e ML (para análises avançadas)
+scikit-learn>=1.3.0
+scipy>=1.11.0
+statsmodels>=0.14.0
+
+# Cache e Performance
+redis>=5.0.0  # Cache de dados
+flask-caching>=2.1.0
+
+# Utilidades
+python-dateutil>=2.8.2
+pytz>=2023.3
+
+# Desenvolvimento
+jupyter>=1.0.0  # Para prototipagem

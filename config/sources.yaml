@@ -6,25 +6,93 @@
 
 # Fontes do Azure Synapse
 synapse_sources:
-  vendas:
+  # ==========================================================================
+  # ÁREA: PLANTIO
+  # ==========================================================================
+  plantio:
     type: "synapse"
-    database: "DW_Vendas"
+    database: "DW_Agricola"
     schema: "dbo"
-    table: "fato_vendas"
-    load_type: "incremental"  # full, incremental
-    incremental_column: "data_atualizacao"
-    primary_key: ["id_venda"]
-    business_area: "producao"
+    table: "fato_plantio"
+    load_type: "incremental"
+    incremental_column: "data_plantio"
+    primary_key: ["id_plantio"]
+    business_area: "plantio"
+    descricao: "Dados de plantio por talhão, variedade e safra"
 
-  clientes:
+  talhoes:
     type: "synapse"
-    database: "DW_Vendas"
+    database: "DW_Agricola"
     schema: "dbo"
-    table: "dim_clientes"
+    table: "dim_talhoes"
     load_type: "full"
-    primary_key: ["id_cliente"]
-    business_area: "producao"
+    primary_key: ["id_talhao"]
+    business_area: "plantio"
+    descricao: "Cadastro de talhões com área, localização e características"
 
+  variedades_cana:
+    type: "synapse"
+    database: "DW_Agricola"
+    schema: "dbo"
+    table: "dim_variedades"
+    load_type: "full"
+    primary_key: ["id_variedade"]
+    business_area: "plantio"
+    descricao: "Variedades de cana-de-açúcar cultivadas"
+
+  # ==========================================================================
+  # ÁREA: VINHAÇA (FERTIRRIGAÇÃO)
+  # ==========================================================================
+  aplicacao_vinhaca:
+    type: "synapse"
+    database: "DW_Fertirrigacao"
+    schema: "dbo"
+    table: "fato_aplicacao_vinhaca"
+    load_type: "incremental"
+    incremental_column: "data_aplicacao"
+    primary_key: ["id_aplicacao"]
+    business_area: "vinhaca"
+    descricao: "Aplicações de vinhaça por talhão (m³/ha)"
+
+  analise_vinhaca:
+    type: "synapse"
+    database: "DW_Fertirrigacao"
+    schema: "dbo"
+    table: "analises_vinhaca"
+    load_type: "incremental"
+    incremental_column: "data_analise"
+    primary_key: ["id_analise"]
+    business_area: "vinhaca"
+    descricao: "Análises químicas da vinhaça (K, Ca, Mg, pH)"
+
+  # ==========================================================================
+  # ÁREA: PREPARO DE SOLO
+  # ==========================================================================
+  preparo_solo:
+    type: "synapse"
+    database: "DW_Agricola"
+    schema: "dbo"
+    table: "fato_preparo_solo"
+    load_type: "incremental"
+    incremental_column: "data_operacao"
+    primary_key: ["id_operacao"]
+    business_area: "preparo_solo"
+    descricao: "Operações de preparo de solo (aração, gradagem, subsolagem)"
+
+  analise_solo:
+    type: "synapse"
+    database: "DW_Agricola"
+    schema: "dbo"
+    table: "analises_solo"
+    load_type: "incremental"
+    incremental_column: "data_coleta"
+    primary_key: ["id_analise"]
+    business_area: "agronomico"
+    descricao: "Análises de solo por talhão (NPK, pH, matéria orgânica)"
+
+  # ==========================================================================
+  # ÁREA: EQUIPAMENTOS/MANUTENÇÃO
+  # ==========================================================================
   equipamentos:
     type: "synapse"
     database: "DW_Operacoes"
@@ -34,6 +102,7 @@ synapse_sources:
     incremental_column: "data_modificacao"
     primary_key: ["id_equipamento"]
     business_area: "manutencao"
+    descricao: "Cadastro de máquinas e implementos agrícolas"
 
 # Fontes do Azure Data Lake
 datalake_sources:
@@ -45,49 +114,73 @@ datalake_sources:
     date_pattern: "yyyy/MM/dd"
     business_area: "governanca_operacional"
 
-  sensores_iot:
+  sensores_iot_colheita:
     type: "datalake"
-    path: "raw/iot/sensores/"
+    path: "raw/iot/colheitadeiras/"
     format: "parquet"
     load_type: "incremental"
     partition_columns: ["ano", "mes", "dia"]
-    business_area: "producao"
+    business_area: "agronomico"
+    descricao: "Dados IoT das colheitadeiras (TCH, fibra, pureza)"
 
-  dados_agronomicos:
+  dados_climaticos:
     type: "datalake"
-    path: "raw/agronomia/"
+    path: "raw/clima/estacoes/"
     format: "csv"
     delimiter: ";"
     header: true
     encoding: "utf-8"
     load_type: "incremental"
     business_area: "agronomico"
+    descricao: "Dados meteorológicos (precipitação, temperatura, UR)"
+
+  mapas_produtividade:
+    type: "datalake"
+    path: "raw/mapas/produtividade/"
+    format: "parquet"
+    load_type: "incremental"
+    partition_columns: ["safra", "mes"]
+    business_area: "agronomico"
+    descricao: "Mapas de produtividade georreferenciados"
 
 # Fontes do Azure SQL Data Warehouse
 sql_dw_sources:
-  ordens_producao:
+  ordens_servico_agricola:
     type: "sql_dw"
-    schema: "producao"
-    table: "ordens"
+    schema: "operacoes"
+    table: "ordens_servico"
     load_type: "incremental"
     incremental_column: "data_criacao"
     primary_key: ["id_ordem"]
-    business_area: "producao"
+    business_area: "plantio"
+    descricao: "Ordens de serviço agrícola (plantio, tratos culturais)"
 
   planejamento_safra:
     type: "sql_dw"
     schema: "planejamento"
-    table: "safras"
+    table: "planejamento_safras"
     load_type: "full"
     primary_key: ["id_safra", "ano"]
     business_area: "planejamento"
+    descricao: "Planejamento de safras (área, variedades, cronograma)"
 
-  indicadores_diretoria:
+  indicadores_agricolas:
     type: "sql_dw"
     schema: "kpi"
-    table: "indicadores_executivos"
+    table: "indicadores_agricolas"
     load_type: "full"
     business_area: "diretoria"
+    descricao: "Indicadores executivos agrícolas (TCH, ATR, custos)"
+
+  controle_colheita:
+    type: "sql_dw"
+    schema: "operacoes"
+    table: "fato_colheita"
+    load_type: "incremental"
+    incremental_column: "data_colheita"
+    primary_key: ["id_colheita"]
+    business_area: "agronomico"
+    descricao: "Dados de colheita (toneladas, TCH, ATR)"
 
 # Fontes de Arquivos Locais
 local_sources:

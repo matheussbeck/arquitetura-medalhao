@@ -1,0 +1,166 @@
+# ============================================================================
+# CONFIGURAÇÃO DE PIPELINE - PLANTIO
+# ============================================================================
+# Define a execução completa do pipeline de plantio (Bronze → Silver → Gold)
+# ============================================================================
+
+# Informações gerais
+name: "Pipeline Plantio"
+version: "1.0.0"
+area: "plantio"
+description: "Pipeline completo para dados de plantio: talhões, variedades, cronograma"
+
+# Agendamento (cron expression)
+schedule:
+  enabled: true
+  cron: "0 6 * * *"  # Diariamente às 06:00
+  timezone: "America/Sao_Paulo"
+
+# Ordem de execução das camadas
+execution_order:
+  - bronze
+  - silver
+  - gold
+
+# Configurações por camada
+layers:
+  # ==========================================================================
+  # BRONZE - Ingestão de dados
+  # ==========================================================================
+  bronze:
+    enabled: true
+    execution_mode: serial  # serial ou parallel
+    continue_on_error: false  # Para em caso de erro
+    max_parallel_workers: 3  # Se parallel
+
+    notebooks:
+      - name: "Ingestão - Dados de Plantio"
+        path: "/Workspace/notebooks/bronze/plantio/bronze_plantio"
+        timeout: 1800  # 30 minutos
+        parameters:
+          data_inicio: "2024-01-01"
+
+      - name: "Ingestão - Cadastro de Talhões"
+        path: "/Workspace/notebooks/bronze/plantio/bronze_talhoes"
+        timeout: 900  # 15 minutos
+        parameters: {}
+
+      - name: "Ingestão - Variedades de Cana"
+        path: "/Workspace/notebooks/bronze/plantio/bronze_variedades"
+        timeout: 600  # 10 minutos
+        parameters: {}
+
+  # ==========================================================================
+  # SILVER - Limpeza e Transformação
+  # ==========================================================================
+  silver:
+    enabled: true
+    execution_mode: serial
+    continue_on_error: false
+
+    notebooks:
+      - name: "Limpeza - Dados de Plantio"
+        path: "/Workspace/notebooks/silver/plantio/silver_plantio"
+        timeout: 2400  # 40 minutos
+        parameters: {}
+
+      - name: "Limpeza - Talhões"
+        path: "/Workspace/notebooks/silver/plantio/silver_talhoes"
+        timeout: 1200  # 20 minutos
+        parameters: {}
+
+  # ==========================================================================
+  # GOLD - Agregações e Métricas
+  # ==========================================================================
+  gold:
+    enabled: true
+    execution_mode: parallel  # Pode executar em paralelo
+    continue_on_error: true  # Continua se um falhar
+    max_parallel_workers: 3
+
+    notebooks:
+      - name: "KPIs - Área Plantada por Variedade"
+        path: "/Workspace/notebooks/gold/plantio/gold_area_por_variedade"
+        timeout: 1800
+        parameters:
+          granularidade: "mensal"
+
+      - name: "KPIs - Cronograma de Plantio"
+        path: "/Workspace/notebooks/gold/plantio/gold_cronograma_plantio"
+        timeout: 1800
+        parameters: {}
+
+      - name: "KPIs - Produtividade Esperada"
+        path: "/Workspace/notebooks/gold/plantio/gold_produtividade_esperada"
+        timeout: 2400
+        parameters: {}
+
+# Notificações
+notifications:
+  on_success:
+    enabled: true
+    channels:
+      - email:
+          recipients:
+            - "equipe.agricola@empresa.com"
+            - "ti.dados@empresa.com"
+          subject: "✅ Pipeline Plantio - Sucesso"
+
+  on_failure:
+    enabled: true
+    channels:
+      - email:
+          recipients:
+            - "equipe.agricola@empresa.com"
+            - "ti.dados@empresa.com"
+            - "suporte.urgente@empresa.com"
+          subject: "❌ Pipeline Plantio - FALHA"
+      - teams:
+          webhook_url: "${TEAMS_WEBHOOK_URL}"
+          message: "❌ ATENÇÃO: Pipeline de Plantio falhou!"
+
+# Retry em caso de falha
+retry:
+  enabled: true
+  max_attempts: 3
+  delay_seconds: 300  # 5 minutos entre tentativas
+  exponential_backoff: true
+
+# Dependências (outros pipelines que devem executar antes)
+dependencies:
+  - pipeline: "pipeline_cadastros_basicos"
+    required: false  # Se true, falha se dependência falhar
+
+# Monitoramento
+monitoring:
+  sla_minutes: 120  # SLA de 2 horas para completar
+  alert_on_sla_breach: true
+
+  metrics:
+    - name: "total_area_plantada_ha"
+      table: "gold.plantio.area_por_variedade"
+      column: "area_total_ha"
+      threshold_min: 1000  # Alerta se menos de 1000 ha
+
+    - name: "numero_talhoes"
+      table: "silver.plantio.talhoes"
+      column: "id_talhao"
+      aggregation: "count"
+      threshold_min: 10
+
+# Limpeza de dados antigos
+cleanup:
+  enabled: true
+  bronze:
+    retention_days: 90  # Mantém Bronze por 90 dias
+  silver:
+    retention_days: 180  # Mantém Silver por 6 meses
+  gold:
+    retention_days: 365  # Mantém Gold por 1 ano
+
+# Tags para organização
+tags:
+  departamento: "Agronomia"
+  prioridade: "alta"
+  ambiente: "producao"
+  criticidade: "alta"

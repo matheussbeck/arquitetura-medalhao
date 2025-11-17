@@ -1,0 +1,40 @@
+# ============================================================================
+# DEPENDÊNCIAS PYTHON - ARQUITETURA MEDALHÃO
+# ============================================================================
+# Instale com: pip install -r requirements.txt
+# ============================================================================
+
+# PySpark (geralmente já vem instalado no Databricks/Synapse)
+pyspark>=3.4.0
+
+# Configuração
+python-dotenv>=1.0.0
+PyYAML>=6.0
+
+# Azure
+azure-storage-blob>=12.19.0
+azure-identity>=1.15.0
+
+# SharePoint/Office 365
+Office365-REST-Python-Client>=2.5.3
+requests>=2.31.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+openpyxl>=3.1.0  # Para ler Excel
+
+# Delta Lake (pode já vir com Databricks)
+delta-spark>=2.4.0
+
+# Utilitários
+python-dateutil>=2.8.2
+
+# Desenvolvimento (opcional)
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
+
+# Jupyter (para desenvolvimento local)
+jupyter>=1.0.0
+notebook>=7.0.0

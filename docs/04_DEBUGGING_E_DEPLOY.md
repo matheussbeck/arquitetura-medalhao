@@ -1,0 +1,628 @@
+# 🔧 Guia de Debugging e Deploy
+
+## Índice
+1. [Debugging - Problemas Comuns](#debugging---problemas-comuns)
+2. [Como Investigar Erros](#como-investigar-erros)
+3. [Ferramentas de Debug](#ferramentas-de-debug)
+4. [Deploy e Execução](#deploy-e-execução)
+5. [Monitoramento](#monitoramento)
+
+---
+
+## Debugging - Problemas Comuns
+
+### 1. "Nenhum Dado Retornado"
+
+**Sintoma**: DataFrame vazio ou `count()` retorna 0
+
+**Possíveis Causas**:
+1. Filtros muito restritivos
+2. Caminho de leitura incorreto
+3. Partições vazias
+4. Data incremental no futuro
+
+**Como Investigar**:
+```python
+# 1. Verifique se o arquivo existe
+caminho = "bronze/producao/vendas/"
+if adls.path_exists(caminho):
+    print("✅ Caminho existe")
+else:
+    print("❌ Caminho NÃO existe!")
+
+# 2. Leia SEM filtros primeiro
+df_total = spark.read.parquet(caminho)
+print(f"Total sem filtros: {df_total.count()}")
+
+# 3. Aplique filtros um por um
+df_filtrado = df_total.filter(col("valor") > 0)
+print(f"Após filtro valor: {df_filtrado.count()}")
+
+df_filtrado = df_filtrado.filter(col("data") >= "2024-01-01")
+print(f"Após filtro data: {df_filtrado.count()}")
+
+# 4. Verifique valores únicos das colunas de filtro
+df_total.select("data").distinct().show()
+df_total.select("valor").describe().show()
+```
+
+**Solução Comum**:
+```python
+# Se o problema é formato de data:
+# ❌ Pode falhar
+df.filter(col("data") >= "2024-01-01")
+
+# ✅ Melhor
+df.filter(F.to_date(col("data")) >= F.lit("2024-01-01"))
+```
+
+---
+
+### 2. "AnalysisException: cannot resolve 'coluna'"
+
+**Sintoma**: Erro dizendo que coluna não existe
+
+**Possíveis Causas**:
+1. Nome da coluna errado (maiúsculas/minúsculas)
+2. Coluna foi removida em transformação anterior
+3. Coluna está em outra tabela (em joins)
+
+**Como Investigar**:
+```python
+# 1. Liste todas as colunas
+print("Colunas disponíveis:")
+print(df.columns)
+
+# 2. Verifique schema
+df.printSchema()
+
+# 3. Procure coluna similar (case-insensitive)
+coluna_procurada = "Nome"
+colunas_similares = [c for c in df.columns if coluna_procurada.lower() in c.lower()]
+print(f"Colunas similares: {colunas_similares}")
+```
+
+**Solução Comum**:
+```python
+# Use o nome exato da coluna
+# ❌
+df.select("Nome")
+
+# ✅
+df.select("nome")  # ou "NOME", conforme o schema
+```
+
+---
+
+### 3. "Py4JJavaError" ou "SparkException"
+
+**Sintoma**: Erro longo com stack trace do Java
+
+**Possíveis Causas**:
+1. Memória insuficiente
+2. Operação em coluna nula sem tratamento
+3. Divisão por zero
+4. Formato de arquivo corrompido
+
+**Como Investigar**:
+```python
+# 1. Verifique nulos antes de operações
+df.select([
+    F.count(F.when(F.col(c).isNull(), c)).alias(c)
+    for c in df.columns
+]).show()
+
+# 2. Trate divisões por zero
+# ❌ Pode dar erro
+df.withColumn("resultado", col("a") / col("b"))
+
+# ✅ Seguro
+df.withColumn("resultado",
+    F.when(col("b") != 0, col("a") / col("b"))
+     .otherwise(None)
+)
+
+# 3. Teste com amostra pequena primeiro
+df_sample = df.limit(100)
+resultado = processar(df_sample)  # Testa com 100 linhas
+```
+
+**Solução Comum**:
+- Leia a mensagem de erro até o fim (última linha geralmente tem a causa)
+- Reduza o dataset para testar
+- Adicione `.show()` após cada transformação
+
+---
+
+### 4. Pipeline Muito Lento
+
+**Sintoma**: Execução demora horas
+
+**Possíveis Causas**:
+1. Muitas partições pequenas (small files problem)
+2. Sem particionamento adequado
+3. Joins sem broadcast
+4. Shuffle excessivo
+
+**Como Investigar**:
+```python
+# 1. Verifique número de partições
+print(f"Partições: {df.rdd.getNumPartitions()}")
+
+# 2. Verifique tamanho dos dados
+print(f"Registros: {df.count():,}")
+
+# 3. Use explain() para ver plano de execução
+df.explain()
+
+# 4. Monitore Spark UI
+# Acesse: http://<databricks-url>/driver-logs
+```
+
+**Soluções**:
+```python
+# 1. Reparticione se necessário
+# Muitas partições pequenas
+df = df.coalesce(20)  # Reduz para 20 partições
+
+# Poucas partições grandes
+df = df.repartition(200)  # Aumenta para 200
+
+# 2. Use broadcast para tabelas pequenas (<10MB)
+from pyspark.sql.functions import broadcast
+
+df_resultado = df_grande.join(
+    broadcast(df_pequena),  # ⬅️ Broadcast da tabela pequena
+    on="id"
+)
+
+# 3. Persista DataFrames reutilizados
+df_intermediario.cache()
+# ... usa várias vezes ...
+df_intermediario.unpersist()
+
+# 4. Otimize Delta Tables
+spark.sql(f"""
+    OPTIMIZE delta.`{path}`
+    ZORDER BY (coluna_filtrada_frequentemente)
+""")
+```
+
+---
+
+### 5. "FileNotFoundException" ou "Path does not exist"
+
+**Sintoma**: Arquivo ou caminho não encontrado
+
+**Como Investigar**:
+```python
+# 1. Liste arquivos no diretório
+arquivos = adls.list_files("bronze/producao/")
+print(f"Arquivos encontrados: {len(arquivos)}")
+for arq in arquivos[:5]:  # Mostra os 5 primeiros
+    print(f"  - {arq}")
+
+# 2. Verifique se caminho existe
+if adls.path_exists("bronze/producao/vendas/"):
+    print("✅ Caminho existe")
+else:
+    print("❌ Caminho não existe")
+
+# 3. Verifique configuração de credenciais
+# Tente acessar com dbutils (Databricks)
+dbutils.fs.ls("abfss://bronze@storage.dfs.core.windows.net/")
+```
+
+**Soluções**:
+```python
+# Construa caminho corretamente
+# ❌ Pode falhar em diferentes ambientes
+path = "bronze/producao/vendas/"
+
+# ✅ Usa helper que constrói caminho completo
+path = adls.get_layer_path("bronze", "producao/vendas/")
+```
+
+---
+
+### 6. Dados Duplicados Após Join
+
+**Sintoma**: Após join, tem mais linhas que esperado
+
+**Possíveis Causas**:
+1. Relação muitos-para-muitos não intencional
+2. Duplicatas na tabela de referência
+3. Join sem condição correta
+
+**Como Investigar**:
+```python
+# 1. Conte antes do join
+print(f"df_vendas: {df_vendas.count()}")
+print(f"df_clientes: {df_clientes.count()}")
+
+# 2. Verifique duplicatas nas chaves de join
+print("\nDuplicatas em df_clientes:")
+df_clientes.groupBy("id_cliente").count() \
+    .filter(col("count") > 1) \
+    .show()
+
+# 3. Faça o join e conte
+df_resultado = df_vendas.join(df_clientes, on="id_cliente")
+print(f"Resultado: {df_resultado.count()}")
+```
+
+**Solução**:
+```python
+# Remove duplicatas da tabela de referência ANTES do join
+df_clientes_unico = df_clientes.dropDuplicates(["id_cliente"])
+
+# Ou usa left_semi join para apenas filtrar
+df_resultado = df_vendas.join(
+    df_clientes,
+    on="id_cliente",
+    how="left_semi"  # Retorna apenas vendas com cliente válido
+)
+```
+
+---
+
+## Como Investigar Erros
+
+### Metodologia Passo a Passo
+
+```python
+# PASSO 1: Execute célula por célula
+# Não rode tudo de uma vez, execute uma célula de cada vez
+
+# PASSO 2: Adicione .show() após cada transformação
+df = spark.read.parquet(path)
+df.show(5)  # ⬅️ ADICIONE ISSO
+
+df = df.filter(col("valor") > 0)
+df.show(5)  # ⬅️ E ISSO
+
+# PASSO 3: Verifique contagens
+print(f"Após leitura: {df.count()}")
+df = df.filter(...)
+print(f"Após filtro: {df.count()}")
+
+# PASSO 4: Inspecione schema
+df.printSchema()
+
+# PASSO 5: Verifique valores únicos
+df.select("coluna_problema").distinct().show()
+
+# PASSO 6: Use describe() para colunas numéricas
+df.select("valor").describe().show()
+```
+
+---
+
+## Ferramentas de Debug
+
+### 1. Spark UI
+
+**Como acessar**:
+- Databricks: Veja "Spark Jobs" na execução do notebook
+- Synapse: Portal Azure > Monitor > Apache Spark applications
+
+**O que procurar**:
+- Stages com mais tempo (gargalos)
+- Tasks com data skew (dados desbalanceados)
+- Shuffle write/read (otimizar particionamento)
+
+### 2. Logs do Python
+
+```python
+# Configure logging mais detalhado
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+logger.debug("Mensagem de debug detalhada")
+logger.info("Informação")
+logger.warning("Aviso")
+logger.error("Erro")
+```
+
+### 3. DataFrame Profiling
+
+```python
+# Análise exploratória rápida
+def profile_dataframe(df, name="DataFrame"):
+    print(f"\n{'='*80}")
+    print(f"PROFILE: {name}")
+    print(f"{'='*80}")
+
+    print(f"\n📊 Dimensões:")
+    print(f"   Linhas: {df.count():,}")
+    print(f"   Colunas: {len(df.columns)}")
+
+    print(f"\n📋 Schema:")
+    df.printSchema()
+
+    print(f"\n🔍 Valores Nulos:")
+    df.select([
+        F.sum(F.when(F.col(c).isNull(), 1).otherwise(0)).alias(c)
+        for c in df.columns
+    ]).show()
+
+    print(f"\n📊 Estatísticas:")
+    numeric_cols = [f.name for f in df.schema.fields
+                   if f.dataType.simpleString() in ['int', 'bigint', 'double']]
+    if numeric_cols:
+        df.select(numeric_cols).describe().show()
+
+    print(f"\n🔢 Primeiras 5 linhas:")
+    df.show(5, truncate=False)
+
+# Use assim
+profile_dataframe(df, "Vendas após limpeza")
+```
+
+### 4. Validação de Dados
+
+```python
+# Use DataQualityChecker
+from data_quality import DataQualityChecker
+
+checker = DataQualityChecker()
+
+# Relatório completo
+report = checker.generate_quality_report(
+    df,
+    key_columns=["id"],
+    schema={"id": "bigint", "nome": "string"}
+)
+```
+
+---
+
+## Deploy e Execução
+
+### Ambiente de Desenvolvimento
+
+#### 1. Configurar Variáveis de Ambiente
+
+```bash
+# Copie o exemplo
+cp .env.example .env
+
+# Edite com suas credenciais
+nano .env
+
+# Teste se está carregando
+python -c "from dotenv import load_dotenv; import os; load_dotenv(); print(os.getenv('AZURE_STORAGE_ACCOUNT'))"
+```
+
+#### 2. Testar Localmente (se possível)
+
+```python
+# Crie sessão Spark local
+spark = SparkSession.builder \
+    .appName("TesteLocal") \
+    .master("local[*]") \
+    .getOrCreate()
+
+# Teste com dados pequenos
+df_teste = spark.createDataFrame([...])
+processar(df_teste)
+```
+
+---
+
+### Databricks
+
+#### 1. Upload de Notebooks
+
+```bash
+# Via Databricks CLI
+databricks workspace import \
+    notebooks/bronze/bronze_vendas.py \
+    /Workspace/notebooks/bronze/bronze_vendas \
+    --language PYTHON
+```
+
+#### 2. Criar Job
+
+1. No workspace Databricks: **Workflows** > **Create Job**
+2. Configure:
+   - **Name**: Pipeline Producao
+   - **Task**: Notebook
+   - **Path**: `/Workspace/pipelines/producao/pipeline_producao`
+   - **Cluster**: Selecione ou crie cluster
+   - **Schedule**: Configure periodicidade
+
+#### 3. Configurar Cluster
+
+Configurações recomendadas:
+```
+Runtime: DBR 13.3 LTS ou superior
+Node Type:
+  - Dev: Standard_D4s_v3 (4 cores, 16GB RAM)
+  - Prod: Standard_D8s_v3 (8 cores, 32GB RAM)
+Min Workers: 2
+Max Workers: 10
+Autoscaling: Enabled
+```
+
+#### 4. Variáveis de Ambiente no Databricks
+
+```python
+# Configure em: Cluster > Configuration > Spark > Environment Variables
+AZURE_STORAGE_ACCOUNT=seu-storage
+SYNAPSE_DATABASE=seu-database
+# etc.
+```
+
+---
+
+### Azure Synapse
+
+#### 1. Upload via Synapse Studio
+
+1. Abra Synapse Studio
+2. **Develop** > **Notebooks** > **Import**
+3. Selecione seus notebooks
+4. Publique mudanças
+
+#### 2. Criar Pipeline
+
+1. **Integrate** > **Pipeline** > **New Pipeline**
+2. Adicione **Notebook Activity**
+3. Configure:
+   - Notebook: Selecione seu notebook
+   - Spark Pool: Selecione pool configurado
+   - Parameters: Adicione se necessário
+
+#### 3. Agendar
+
+1. Na pipeline: **Add trigger** > **New/Edit**
+2. Configure:
+   - **Type**: Schedule
+   - **Recurrence**: Daily, 06:00
+   - **Time zone**: Brasília (UTC-3)
+
+---
+
+### Azure Data Factory
+
+#### 1. Criar Pipeline ADF
+
+```json
+{
+  "name": "Pipeline_Producao",
+  "properties": {
+    "activities": [
+      {
+        "name": "Execute_Bronze",
+        "type": "DatabricksNotebook",
+        "linkedServiceName": "DatabricksLinkedService",
+        "typeProperties": {
+          "notebookPath": "/notebooks/bronze/bronze_vendas"
+        }
+      },
+      {
+        "name": "Execute_Silver",
+        "type": "DatabricksNotebook",
+        "dependsOn": ["Execute_Bronze"],
+        "typeProperties": {
+          "notebookPath": "/notebooks/silver/silver_vendas"
+        }
+      }
+    ]
+  }
+}
+```
+
+#### 2. Configurar Trigger
+
+```json
+{
+  "name": "DailyTrigger",
+  "type": "ScheduleTrigger",
+  "typeProperties": {
+    "recurrence": {
+      "frequency": "Day",
+      "interval": 1,
+      "startTime": "2024-01-01T06:00:00Z",
+      "timeZone": "E. South America Standard Time"
+    }
+  }
+}
+```
+
+---
+
+## Monitoramento
+
+### 1. Logs de Auditoria
+
+```python
+# Consulte tabela de auditoria
+df_logs = spark.read.format("delta").load("gold/auditoria_execucoes/")
+
+# Execuções recentes
+df_logs.filter(col("start_time") >= F.current_date() - 7) \
+    .orderBy(col("start_time").desc()) \
+    .show(20, truncate=False)
+
+# Execuções com falha
+df_logs.filter(col("status") == "failed") \
+    .orderBy(col("start_time").desc()) \
+    .show(truncate=False)
+
+# Duração por pipeline
+df_logs.groupBy("pipeline_name") \
+    .agg(
+        F.avg("duration_seconds").alias("duracao_media"),
+        F.max("duration_seconds").alias("duracao_maxima")
+    ) \
+    .show()
+```
+
+### 2. Alertas
+
+#### Email em Caso de Falha (Databricks)
+
+```python
+# No final do notebook
+if status == "failed":
+    dbutils.notebook.exit(json.dumps({
+        "status": "failed",
+        "error": str(error)
+    }))
+
+# No job, configure: Edit > Email Notifications > On Failure
+```
+
+#### Teams Webhook
+
+```python
+import requests
+
+def enviar_alerta_teams(mensagem, webhook_url):
+    payload = {
+        "text": mensagem
+    }
+    requests.post(webhook_url, json=payload)
+
+# Uso
+if status == "failed":
+    enviar_alerta_teams(
+        f"❌ Pipeline {pipeline_name} falhou!",
+        os.getenv("TEAMS_WEBHOOK_URL")
+    )
+```
+
+---
+
+## Checklist de Deploy
+
+Antes de colocar em produção:
+
+- [ ] Testado com dados reais (amostra)
+- [ ] Testado com dados completos (dev)
+- [ ] Credenciais configuradas
+- [ ] Logs implementados
+- [ ] Tratamento de erros presente
+- [ ] Documentação atualizada
+- [ ] Código versionado no Git
+- [ ] Job/Pipeline configurado
+- [ ] Agendamento configurado
+- [ ] Alertas configurados
+- [ ] Stakeholders informados
+
+---
+
+## Recursos Adicionais
+
+- [Databricks Troubleshooting](https://docs.databricks.com/optimizations/troubleshooting.html)
+- [Spark Tuning Guide](https://spark.apache.org/docs/latest/tuning.html)
+- Templates do projeto: `notebooks/templates/`
+
+---
+
+**Última atualização**: 2024
+**Versão**: 1.0

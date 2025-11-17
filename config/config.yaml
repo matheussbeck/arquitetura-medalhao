@@ -1,0 +1,157 @@
+# ============================================================================
+# CONFIGURAÇÃO PRINCIPAL - ARQUITETURA MEDALHÃO
+# ============================================================================
+# Este arquivo contém as configurações centralizadas do projeto
+# IMPORTANTE: Não commitar credenciais neste arquivo!
+# ============================================================================
+
+# Configurações do Ambiente
+environment:
+  name: "development"  # development, staging, production
+  spark_app_name: "ArquiteturaMedalhao"
+  log_level: "INFO"  # DEBUG, INFO, WARN, ERROR
+
+# Configurações do Azure Data Lake (ADLS)
+azure_data_lake:
+  account_name: "${AZURE_STORAGE_ACCOUNT}"
+  container_bronze: "bronze"
+  container_silver: "silver"
+  container_gold: "gold"
+  connection_string: "${AZURE_STORAGE_CONNECTION_STRING}"
+  use_managed_identity: true  # Se true, usa identidade gerenciada ao invés de connection string
+
+# Configurações do Azure Synapse
+azure_synapse:
+  workspace_name: "${SYNAPSE_WORKSPACE_NAME}"
+  sql_pool_name: "${SYNAPSE_SQL_POOL}"
+  dedicated_pool_endpoint: "${SYNAPSE_DEDICATED_ENDPOINT}"
+  serverless_endpoint: "${SYNAPSE_SERVERLESS_ENDPOINT}"
+  database: "${SYNAPSE_DATABASE}"
+
+# Configurações do Azure SQL Data Warehouse
+azure_sql_dw:
+  server: "${AZURE_SQL_SERVER}"
+  database: "${AZURE_SQL_DATABASE}"
+  port: 1433
+  driver: "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+
+# Configurações do SharePoint
+sharepoint:
+  site_url: "${SHAREPOINT_SITE_URL}"
+  client_id: "${SHAREPOINT_CLIENT_ID}"
+  client_secret: "${SHAREPOINT_CLIENT_SECRET}"
+  tenant_id: "${SHAREPOINT_TENANT_ID}"
+
+# Configurações de Camadas (Medallion Architecture)
+layers:
+  bronze:
+    path: "abfss://bronze@${AZURE_STORAGE_ACCOUNT}.dfs.core.windows.net/"
+    format: "parquet"  # parquet, delta, csv
+    partition_by: ["ano", "mes", "dia"]
+    mode: "append"  # append, overwrite
+
+  silver:
+    path: "abfss://silver@${AZURE_STORAGE_ACCOUNT}.dfs.core.windows.net/"
+    format: "delta"  # Recomendado: Delta Lake para ACID transactions
+    partition_by: ["ano", "mes"]
+    mode: "merge"  # merge, overwrite
+    enable_schema_evolution: true
+
+  gold:
+    path: "abfss://gold@${AZURE_STORAGE_ACCOUNT}.dfs.core.windows.net/"
+    format: "delta"
+    partition_by: ["ano"]
+    mode: "overwrite"
+    optimize_write: true
+    z_order_by: []  # Colunas para Z-Order optimization
+
+# Configurações de Performance
+performance:
+  shuffle_partitions: 200
+  adaptive_execution: true
+  dynamic_allocation: true
+  executor_memory: "4g"
+  executor_cores: 2
+  driver_memory: "2g"
+  max_executors: 10
+
+# Configurações de Quality Check
+quality:
+  enable_data_validation: true
+  enable_schema_validation: true
+  null_threshold: 0.05  # 5% de valores nulos aceitáveis
+  duplicate_threshold: 0.01  # 1% de duplicatas aceitáveis
+
+# Configurações de Logging e Auditoria
+logging:
+  enable_audit_log: true
+  audit_table: "gold.auditoria_execucoes"
+  log_level: "INFO"
+  log_path: "abfss://logs@${AZURE_STORAGE_ACCOUNT}.dfs.core.windows.net/"
+
+# Configurações de Retry e Timeout
+resilience:
+  max_retries: 3
+  retry_delay_seconds: 60
+  timeout_seconds: 3600
+  enable_circuit_breaker: true
+
+# Configurações por Área de Negócio
+business_areas:
+  cct:
+    enabled: true
+    schedule: "0 6 * * *"  # Cron expression
+    priority: "high"
+
+  producao:
+    enabled: true
+    schedule: "0 7 * * *"
+    priority: "high"
+
+  manutencao:
+    enabled: true
+    schedule: "0 8 * * *"
+    priority: "medium"
+
+  apoio:
+    enabled: true
+    schedule: "0 9 * * *"
+    priority: "medium"
+
+  ssma:
+    enabled: true
+    schedule: "0 10 * * *"
+    priority: "medium"
+
+  agronomico:
+    enabled: true
+    schedule: "0 11 * * *"
+    priority: "high"
+
+  planejamento:
+    enabled: true
+    schedule: "0 12 * * *"
+    priority: "high"
+
+  diretoria:
+    enabled: true
+    schedule: "0 5 * * *"
+    priority: "critical"
+
+  governanca_operacional:
+    enabled: true
+    schedule: "0 6 * * *"
+    priority: "high"
+
+  outros:
+    enabled: true
+    schedule: "0 13 * * *"
+    priority: "low"
+
+# Configurações de Notificações
+notifications:
+  enable_email: true
+  email_on_failure: true
+  email_recipients: []
+  enable_teams: false
+  teams_webhook_url: "${TEAMS_WEBHOOK_URL}"

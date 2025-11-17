@@ -1,0 +1,206 @@
+# ============================================================================
+# CONFIGURAÇÃO DE FONTES DE DADOS
+# ============================================================================
+# Define todas as fontes de dados consumidas pelo projeto
+# ============================================================================
+
+# Fontes do Azure Synapse
+synapse_sources:
+  vendas:
+    type: "synapse"
+    database: "DW_Vendas"
+    schema: "dbo"
+    table: "fato_vendas"
+    load_type: "incremental"  # full, incremental
+    incremental_column: "data_atualizacao"
+    primary_key: ["id_venda"]
+    business_area: "producao"
+
+  clientes:
+    type: "synapse"
+    database: "DW_Vendas"
+    schema: "dbo"
+    table: "dim_clientes"
+    load_type: "full"
+    primary_key: ["id_cliente"]
+    business_area: "producao"
+
+  equipamentos:
+    type: "synapse"
+    database: "DW_Operacoes"
+    schema: "dbo"
+    table: "equipamentos"
+    load_type: "incremental"
+    incremental_column: "data_modificacao"
+    primary_key: ["id_equipamento"]
+    business_area: "manutencao"
+
+# Fontes do Azure Data Lake
+datalake_sources:
+  logs_aplicacao:
+    type: "datalake"
+    path: "raw/logs/aplicacao/"
+    format: "json"
+    load_type: "incremental"
+    date_pattern: "yyyy/MM/dd"
+    business_area: "governanca_operacional"
+
+  sensores_iot:
+    type: "datalake"
+    path: "raw/iot/sensores/"
+    format: "parquet"
+    load_type: "incremental"
+    partition_columns: ["ano", "mes", "dia"]
+    business_area: "producao"
+
+  dados_agronomicos:
+    type: "datalake"
+    path: "raw/agronomia/"
+    format: "csv"
+    delimiter: ";"
+    header: true
+    encoding: "utf-8"
+    load_type: "incremental"
+    business_area: "agronomico"
+
+# Fontes do Azure SQL Data Warehouse
+sql_dw_sources:
+  ordens_producao:
+    type: "sql_dw"
+    schema: "producao"
+    table: "ordens"
+    load_type: "incremental"
+    incremental_column: "data_criacao"
+    primary_key: ["id_ordem"]
+    business_area: "producao"
+
+  planejamento_safra:
+    type: "sql_dw"
+    schema: "planejamento"
+    table: "safras"
+    load_type: "full"
+    primary_key: ["id_safra", "ano"]
+    business_area: "planejamento"
+
+  indicadores_diretoria:
+    type: "sql_dw"
+    schema: "kpi"
+    table: "indicadores_executivos"
+    load_type: "full"
+    business_area: "diretoria"
+
+# Fontes de Arquivos Locais
+local_sources:
+  planilhas_cct:
+    type: "local"
+    path: "data/input/cct/"
+    format: "excel"
+    sheet_name: "Dados"
+    load_type: "full"
+    business_area: "cct"
+
+  arquivos_ssma:
+    type: "local"
+    path: "data/input/ssma/"
+    format: "csv"
+    delimiter: ","
+    encoding: "latin1"
+    load_type: "incremental"
+    business_area: "ssma"
+
+# Fontes do SharePoint
+sharepoint_sources:
+  relatorios_apoio:
+    type: "sharepoint"
+    site: "${SHAREPOINT_SITE_URL}"
+    library: "Documentos Compartilhados"
+    folder: "Relatorios/Apoio"
+    file_pattern: "*.xlsx"
+    load_type: "incremental"
+    business_area: "apoio"
+
+  documentos_governanca:
+    type: "sharepoint"
+    site: "${SHAREPOINT_SITE_URL}"
+    library: "Governança"
+    folder: "Operacional"
+    file_pattern: "*.csv"
+    load_type: "incremental"
+    business_area: "governanca_operacional"
+
+  planilhas_manutencao:
+    type: "sharepoint"
+    site: "${SHAREPOINT_SITE_URL}"
+    library: "Manutencao"
+    folder: "Dados"
+    file_pattern: "Manutencao_*.xlsx"
+    load_type: "incremental"
+    business_area: "manutencao"
+
+# Mapeamento de Transformações por Fonte
+transformations:
+  vendas:
+    bronze_to_silver:
+      - remove_duplicates
+      - validate_schema
+      - clean_null_values
+      - standardize_dates
+      - add_audit_columns
+    silver_to_gold:
+      - aggregate_by_period
+      - calculate_metrics
+      - create_dimensions
+
+  equipamentos:
+    bronze_to_silver:
+      - remove_duplicates
+      - validate_equipamento_id
+      - standardize_status
+      - add_audit_columns
+    silver_to_gold:
+      - calculate_availability
+      - aggregate_failures
+      - create_maintenance_metrics
+
+  dados_agronomicos:
+    bronze_to_silver:
+      - parse_coordinates
+      - validate_measurements
+      - clean_outliers
+      - standardize_units
+      - add_audit_columns
+    silver_to_gold:
+      - aggregate_by_area
+      - calculate_productivity
+      - create_yield_metrics
+
+# Schema Definitions (para validação)
+schemas:
+  vendas:
+    id_venda: "long"
+    data_venda: "timestamp"
+    id_cliente: "long"
+    id_produto: "long"
+    quantidade: "double"
+    valor_total: "double"
+    data_atualizacao: "timestamp"
+
+  equipamentos:
+    id_equipamento: "string"
+    nome: "string"
+    tipo: "string"
+    status: "string"
+    data_aquisicao: "date"
+    ultima_manutencao: "timestamp"
+    data_modificacao: "timestamp"
+
+  dados_agronomicos:
+    id_talhao: "string"
+    area_ha: "double"
+    cultura: "string"
+    variedade: "string"
+    data_plantio: "date"
+    data_colheita: "date"
+    produtividade_ton_ha: "double"
+    latitude: "double"
+    longitude: "double"

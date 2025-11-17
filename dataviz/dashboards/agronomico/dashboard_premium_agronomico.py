@@ -174,14 +174,13 @@ def create_3d_surface_plot(df):
     )])
 
     fig.update_layout(
-        title="Análise 3D: TCH x ATR x Idade do Canavial",
+        **get_standard_layout("Análise 3D: TCH x ATR x Idade do Canavial"),
         scene=dict(
             xaxis_title='Idade (anos)',
             yaxis_title='ATR',
             zaxis_title='TCH (t/ha)',
             camera=dict(eye=dict(x=1.5, y=1.5, z=1.3))
         ),
-        **get_standard_layout("Análise 3D"),
         height=500
     )
 

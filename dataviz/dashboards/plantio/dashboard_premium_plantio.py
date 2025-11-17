@@ -26,7 +26,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent / "utils"))
 
 import dash
-from dash import dcc, html, Input, Output, State, callback_context
+from dash import dcc, html, dash_table, Input, Output, State, callback_context
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import plotly.express as px

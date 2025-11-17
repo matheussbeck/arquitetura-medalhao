@@ -214,8 +214,10 @@ def create_quality_control_chart(df, parameter, label, ideal, min_val, max_val, 
     ))
 
     fig.update_layout(
-        **get_standard_layout(f"Controle de Qualidade - {label}"),
-        hovermode='x unified',
+        **get_standard_layout(
+            f"Controle de Qualidade - {label}",
+            hovermode='x unified'
+        ),
         yaxis=dict(
             title=label,
             gridcolor='#e9ecef'
